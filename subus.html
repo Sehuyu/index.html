@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>버스 하차 알람 - DEMO</title>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--line:#334155;--txt:#e2e8f0;--sub:#94a3b8;--acc:#38bdf8;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171}
+*{box-sizing:border-box;margin:0}
+body{font-family:system-ui,"Malgun Gothic",sans-serif;background:#020617;color:var(--txt);display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:16px;gap:24px;flex-wrap:wrap}
+.phone{width:380px;height:760px;background:#000;border-radius:36px;border:8px solid #000;position:relative;overflow:hidden;box-shadow:0 20px 60px #000a}
+.status{display:flex;justify-content:space-between;padding:10px 22px 4px;font-size:12px;color:var(--sub)}
+.screen{flex:1;overflow-y:auto;padding:14px 18px 18px}
+.tabs{display:flex;border-top:1px solid var(--line);background:#0b1222}
+.tabs button{flex:1;padding:12px;background:none;border:0;color:var(--sub);font-size:13px;cursor:pointer}
+.tabs button.on{color:var(--acc);font-weight:700}
+h1{font-size:20px;margin-bottom:4px}h2{font-size:15px;margin:16px 0 8px}
+.sub{color:var(--sub);font-size:13px}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px}
+.btn{width:100%;padding:14px;border:0;border-radius:12px;background:var(--acc);color:#04283a;font-weight:700;font-size:15px;cursor:pointer}
+.btn.big{padding:34px 14px;font-size:22px;border-radius:20px}
+.btn.ghost{background:var(--card);color:var(--txt);border:1px solid var(--line)}
+.btn.bad{background:var(--bad);color:#3b0a0a}
+.btn.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+.chip{padding:8px 4px;border-radius:8px;background:var(--card);border:1px solid var(--line);text-align:center;font-size:13px;cursor:pointer;color:var(--sub);user-select:none}
+.chip.on{background:var(--acc);color:#04283a;border-color:var(--acc);font-weight:700}
+.list .item{display:flex;justify-content:space-between;padding:12px 14px;border-radius:10px;background:var(--card);margin-bottom:6px;cursor:pointer;font-size:14px}
+.list .item:hover{outline:1px solid var(--acc)}
+.list .item.dis{opacity:.35;pointer-events:none}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}.bar>i{display:block;height:100%;background:var(--acc);transition:width .3s}
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--line);color:var(--sub)}
+.badge.ok{background:#14532d;color:var(--ok)}.badge.warn{background:#713f12;color:var(--warn)}.badge.bad{background:#7f1d1d;color:var(--bad)}
+select,input[type=time]{width:100%;padding:10px;border-radius:8px;background:var(--card);color:var(--txt);border:1px solid var(--line);font-size:14px}
+/* route line */
+.route{position:relative;margin:8px 0 8px 16px;padding-left:26px}
+.route:before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:3px;background:var(--line)}
+.stop{position:relative;height:30px;display:flex;align-items:center;font-size:13px;color:var(--sub)}
+.stop:before{content:"";position:absolute;left:-24px;top:10px;width:11px;height:11px;border-radius:50%;background:var(--line);border:2px solid var(--bg)}
+.stop.past{opacity:.4}.stop.trig{color:var(--warn);font-weight:700}.stop.trig:before{background:var(--warn)}
+.stop.dest{color:var(--ok);font-weight:700}.stop.dest:before{background:var(--ok)}
+.bus{position:absolute;left:-1px;font-size:20px;transition:top .25s linear;z-index:2}
+.pill{position:absolute;right:0;font-size:10px;padding:1px 6px;border-radius:8px}
+/* overlay */
+.ov{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:28px;z-index:10;gap:12px}
+.ov.show{display:flex}
+.ov.ring{background:linear-gradient(#065f46,#022c22);animation:pulse 1s infinite}
+.ov.warnov{background:linear-gradient(#7f1d1d,#2b0707);animation:pulse 1s infinite}
+@keyframes pulse{50%{filter:brightness(1.35)}}
+.ov .ico{font-size:72px}
+.toast{position:absolute;left:18px;right:18px;top:48px;background:#f1f5f9;color:#0f172a;padding:10px 14px;border-radius:10px;font-size:13px;z-index:20;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+.side{width:300px;font-size:13px;color:var(--sub);line-height:1.6}
+.side .card{background:#0f172a}.side b{color:var(--txt)}
+
+/* ===== iPhone 스킨 (잠금화면 / 홈화면 / 앱 실행) ===== */
+.dwrap{width:calc(396px*var(--k,1));height:calc(826px*var(--k,1));flex:0 0 auto}
+.device{position:relative;width:390px;height:820px;margin:3px;transform:scale(var(--k,1));transform-origin:0 0}
+.phone{width:390px;height:820px;border:11px solid #0b0b0d;border-radius:60px;background:#000;position:relative;overflow:hidden;
+  box-shadow:0 0 0 3px #6b6b73,0 0 0 4px #2b2b30,0 30px 80px #000c;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased}
+.pbtn,.vbtn{position:absolute;border:0;padding:0;background:linear-gradient(90deg,#2f2f35,#64646c)}
+.pbtn{right:-9px;top:215px;width:7px;height:92px;border-radius:0 4px 4px 0;cursor:pointer;background:linear-gradient(270deg,#2f2f35,#64646c)}
+.pbtn:hover{filter:brightness(1.4)}.pbtn:active{filter:brightness(1.8)}
+.vbtn{left:-9px;width:7px;border-radius:4px 0 0 4px}
+.island{position:absolute;top:11px;left:50%;width:112px;height:33px;margin-left:-56px;border-radius:20px;background:#000;z-index:70;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:600;overflow:hidden;white-space:nowrap;pointer-events:none;
+  transition:width .38s cubic-bezier(.3,.9,.3,1),margin-left .38s cubic-bezier(.3,.9,.3,1),height .38s}
+.island.big{width:250px;margin-left:-125px;height:38px}
+.island span{opacity:0;transition:opacity .15s}
+.island.big span{opacity:1;transition:opacity .25s .18s}
+.wall{background:radial-gradient(90% 60% at 12% 8%,#ffb36bcc,transparent 62%),radial-gradient(80% 60% at 92% 42%,#8b5cf6cc,transparent 62%),radial-gradient(90% 70% at 25% 105%,#06b6d4cc,transparent 62%),linear-gradient(160deg,#1b1464,#3a1c71 50%,#0f2027)}
+/* 상태바 */
+.status,#osbar{height:54px;padding:0 30px 0 38px;font-size:16px;font-weight:600;letter-spacing:-.2px;align-items:center;justify-content:space-between}
+.status{display:flex;color:var(--txt)}
+#osbar{position:absolute;top:0;left:0;right:0;display:flex;color:#fff;z-index:45;pointer-events:none;transition:opacity .25s}
+#osbar.hide{opacity:0}
+.sysic{display:inline-flex;align-items:center;gap:6px}
+.eartag{padding:0 20px;text-align:right;font-size:11px;color:var(--sub);margin-top:-8px}
+/* 앱 창 */
+.app{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);border-radius:49px;z-index:20;opacity:0;transform:scale(.18);pointer-events:none;transition:transform .38s cubic-bezier(.2,.85,.25,1),opacity .22s}
+.app.open{opacity:1;transform:none;pointer-events:auto}
+.app .tabs{padding-bottom:24px}
+.toast{top:62px}
+.dbody{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;padding:0 30px}
+.dem{font-size:68px}
+/* 홈 화면 */
+.home{position:absolute;inset:0;z-index:1;padding-top:58px;transition:transform .32s,filter .32s,border-radius .3s}
+.home.dim{transform:scale(.9);filter:brightness(.5);border-radius:40px}
+.widget{margin:8px 16px 0;height:128px;border-radius:26px;background:rgba(255,255,255,.2);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:#fff;padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;transition:transform .12s;box-shadow:inset 0 0 0 .5px #fff4}
+.widget:active{transform:scale(.97)}
+.widget .wh{font-size:12px;font-weight:600;opacity:.85}
+.widget .w1{font-size:26px;font-weight:700;letter-spacing:-.5px;line-height:1.1}
+.widget .w2{font-size:12.5px;opacity:.85}
+.widget .wb{align-self:flex-start;font-size:12px;font-weight:600;background:rgba(255,255,255,.25);padding:5px 11px;border-radius:12px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px 0;padding:0 14px;margin-top:26px}
+.icon{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;color:#fff;font-size:11px;font-weight:500;text-shadow:0 1px 3px #0007;user-select:none;transition:transform .12s}
+.icon:active{transform:scale(.86)}
+.icon .ic{width:62px;height:62px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 3px 8px #0004,inset 0 1px 0 #fff6,inset 0 -1px 0 #0002}
+.spill{position:absolute;left:50%;transform:translateX(-50%);bottom:118px;padding:6px 28px;border-radius:16px;background:rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:500;backdrop-filter:blur(12px)}
+.dock{position:absolute;left:12px;right:12px;bottom:22px;height:92px;border-radius:38px;background:rgba(255,255,255,.2);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);display:flex;justify-content:space-around;align-items:center;box-shadow:inset 0 0 0 .5px #fff3}
+.dock .icon span{display:none}
+/* 알림 공통 */
+.ni{flex:0 0 auto;width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#38bdf8,#2563eb);display:flex;align-items:center;justify-content:center;font-size:19px}
+.nt{flex:1;min-width:0;font-size:13px;line-height:1.35}
+.nh{display:flex;justify-content:space-between;font-size:11px;opacity:.7;margin-bottom:1px}
+.nh b{font-weight:600}
+/* 잠금 화면 */
+.lock{position:absolute;inset:0;z-index:30;transition:transform .45s cubic-bezier(.3,.7,.2,1);overflow:hidden}
+.lock.gone{transform:translateY(-105%);pointer-events:none}
+.lock.drag{transition:none}
+.lmain{position:absolute;inset:0;padding:66px 14px 34px;display:flex;flex-direction:column;align-items:center;transition:opacity .25s,transform .25s;touch-action:none;cursor:grab;color:#fff;user-select:none}
+.lmain.hide{opacity:0;pointer-events:none;transform:scale(.96)}
+.lk{height:22px;margin-bottom:12px;opacity:.95}
+.ldate{font-size:20px;font-weight:500;opacity:.9}
+.lclock{font-size:98px;font-weight:600;letter-spacing:-2px;line-height:1.02;opacity:.92;margin-top:-2px}
+.lnotifs{margin-top:auto;width:100%;display:flex;flex-direction:column;gap:8px;margin-bottom:26px}
+.ncard{display:flex;gap:10px;align-items:flex-start;background:rgba(255,255,255,.26);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:24px;padding:12px 14px;cursor:pointer;animation:nin .35s;box-shadow:inset 0 0 0 .5px #fff3}
+@keyframes nin{from{opacity:0;transform:translateY(14px)}}
+.lbot{width:100%;display:flex;justify-content:space-between;align-items:center;padding:0 22px;margin-bottom:14px}
+.lbtn{width:50px;height:50px;border-radius:50%;background:rgba(40,40,50,.45);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;font-size:21px;cursor:pointer;transition:.15s}
+.lbtn:active{transform:scale(.9)}
+.lbtn.on{background:#fff;filter:none}
+.lhint{font-size:12px;opacity:.75;animation:bob 1.8s infinite}
+@keyframes bob{50%{transform:translateY(-4px);opacity:.45}}
+.pin{position:absolute;inset:0;background:rgba(20,18,45,.42);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);display:flex;flex-direction:column;align-items:center;padding-top:92px;color:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
+.pin.show{opacity:1;pointer-events:auto}
+.pt{font-size:18px;font-weight:500}
+.dots{display:flex;gap:18px;margin:24px 0 8px}
+.dots i{width:13px;height:13px;border-radius:50%;border:1.5px solid #fff;transition:background .1s}
+.dots i.f{background:#fff}
+.phint{font-size:11px;opacity:.5;margin-bottom:34px}
+.pad{display:grid;grid-template-columns:repeat(3,78px);gap:16px 24px}
+.pad button{width:78px;height:78px;border-radius:50%;border:0;background:rgba(255,255,255,.2);color:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:background .08s,transform .08s;font-family:inherit}
+.pad button b{font-size:34px;font-weight:300;line-height:1}
+.pad button small{font-size:9px;letter-spacing:2px;font-weight:600;margin-top:1px;height:10px}
+.pad button:active{background:rgba(255,255,255,.5)}
+.pad button.sm{background:none;font-size:15px;font-weight:500;white-space:nowrap}
+/* 배너 알림 */
+#banner{position:absolute;top:52px;left:10px;right:10px;z-index:40;display:flex;gap:10px;align-items:flex-start;background:rgba(48,48,56,.88);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);color:#fff;border-radius:28px;padding:13px 16px;box-shadow:0 10px 30px #0009;transform:translateY(-170%);transition:transform .4s cubic-bezier(.3,.9,.3,1);cursor:pointer}
+#banner.show{transform:none}
+/* 홈 바 / 화면 꺼짐 */
+#hb{position:absolute;left:0;right:0;bottom:0;height:26px;z-index:50;cursor:pointer;display:flex;justify-content:center;align-items:flex-end;padding-bottom:8px}
+#hb i{width:136px;height:5px;border-radius:3px;background:rgba(255,255,255,.9)}
+#black{position:absolute;inset:0;background:#000;z-index:90;opacity:0;pointer-events:none;transition:opacity .3s}
+#black.on{opacity:1;pointer-events:auto}
+</style>
+</head>
+<body>
+<div class="dwrap"><div class="device">
+<button class="vbtn" style="top:128px;height:30px" tabindex="-1"></button><button class="vbtn" style="top:190px;height:58px" tabindex="-1"></button><button class="vbtn" style="top:262px;height:58px" tabindex="-1"></button>
+<button class="pbtn" id="pbtn" title="측면 버튼 (화면 끄기/켜기)" onclick="power()"></button>
+<div class="phone">
+  <!-- 홈 화면 -->
+  <div class="home wall" id="home">
+    <div class="widget" id="widget" onclick="openBus()"></div>
+    <div class="grid" id="grid"></div>
+    <div class="spill">🔍 검색</div>
+    <div class="dock" id="dock"></div>
+  </div>
+  <!-- 안내용 일반 앱 -->
+  <div class="app" id="dapp"><div style="height:60px"></div><div class="dbody"><div class="dem" id="demo">🗺️</div><h1 id="dname"></h1><div class="sub">이 데모에서는 <b style="color:var(--txt)">하차알람</b> 앱만 체험할 수 있어요.<br>화면 아래 바를 눌러 홈으로 돌아가세요.</div></div></div>
+  <!-- 버스 하차알람 앱 -->
+  <div class="app" id="app">
+  <div class="status"><span class="clk">08:00</span><span class="sysic"></span></div>
+  <div class="eartag" id="earTag">🎧 이어폰 연결됨</div>
+  <div class="screen" id="screen"></div>
+  <div class="tabs"><button id="t-home" class="on" onclick="go('home')">🚌 홈</button><button id="t-routine" onclick="go('routine')">🔁 루틴</button></div>
+  <div class="ov ring" id="ovRing"><div class="ico">🔔</div><h1 id="ringTitle"></h1><div id="ringSub"></div><div class="sub">🎧 이어폰으로 재생 중</div><button class="btn ghost" onclick="dismiss()">확인</button></div>
+  <div class="ov warnov" id="ovWarn"><div class="ico">⚠️</div><h1>이어폰이 연결되지 않았어요!</h1><div id="warnSub"></div><div class="sub">스피커 대신 진동·화면 경고로 알려드려요</div><button class="btn ghost" onclick="dismiss()">확인</button></div>
+  <div class="toast" id="toast"></div>
+  </div>
+  <!-- 잠금 화면 -->
+  <div class="lock wall" id="lock">
+    <div class="lmain" id="lmain">
+      <div class="lk"><svg width="18" height="22" viewBox="0 0 18 22" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><rect x="2" y="9.5" width="14" height="11" rx="3" fill="#fff" stroke="none"/><path d="M5 9.5V6.5a4 4 0 0 1 8 0v3"/></svg></div>
+      <div class="ldate dt"></div><div class="lclock clk">08:00</div>
+      <div class="lnotifs" id="lnotifs"></div>
+      <div class="lbot"><div class="lbtn" onclick="flash(event)">🔦</div><div class="lhint">위로 쓸어올려 열기</div><div class="lbtn">📷</div></div>
+    </div>
+    <div class="pin" id="pin">
+      <div class="pt">암호 입력</div>
+      <div class="dots" id="dots"><i></i><i></i><i></i><i></i></div>
+      <div class="phint">데모 · 아무 숫자 4자리나 누르세요</div>
+      <div class="pad" id="pad"></div>
+    </div>
+  </div>
+  <div id="banner" onclick="bannerTap()"><div class="ni">🚌</div><div class="nt"><div class="nh"><b>하차알람</b><span>지금</span></div><b id="bt"></b><div id="bb"></div></div></div>
+  <div id="osbar"><span class="clk">08:00</span><span class="sysic"></span></div>
+  <div id="hb" onclick="homeBar()"><i></i></div>
+  <div class="island" id="island"><span id="itxt"></span></div>
+  <div id="black" onclick="power()"></div>
+</div>
+</div></div>
+<div class="side">
+  <div class="card"><b>📱 폰 조작법</b><br>
+  1. 잠금화면을 <b>위로 쓸거나 클릭</b> → 암호(<b>아무 4자리</b>)<br>
+  2. 홈 화면에서 <b>🚌 하차알람</b> 앱 터치<br>
+  3. 화면 맨 아래 <b>흰 바</b>를 누르면 홈으로<br>
+  4. 폰 오른쪽 <b>측면 버튼</b>으로 화면 끄기/켜기<br>
+  <span style="opacity:.7">앱을 나가 있어도 알람이 오면 알림이 떠요</span>
+  </div>
+  <div class="card"><b>🎬 데모 컨트롤</b> (실제 앱에서는 없음)
+    <div style="margin:10px 0 6px">시뮬레이션 속도</div>
+    <div class="row"><div class="chip on" data-sp="1" onclick="setSpeed(1,this)">1×</div><div class="chip" data-sp="2" onclick="setSpeed(2,this)">2×</div><div class="chip" data-sp="4" onclick="setSpeed(4,this)">4×</div></div>
+    <div style="margin:12px 0 6px">이어폰 연결</div>
+    <div class="row"><div class="chip on" id="earOn" onclick="setEar(true)">🎧 연결</div><div class="chip" id="earOff" onclick="setEar(false)">❌ 미연결</div></div>
+    <div style="margin:12px 0 6px">내 위치 인식 (지금 탑승 시)</div>
+    <div class="row"><div class="chip on" id="locOk" onclick="setLoc(true)">📍 정상</div><div class="chip" id="locNo" onclick="setLoc(false)">🚫 주변 정류장 없음</div></div>
+  </div>
+  <div class="card"><b>📌 이 데모가 보여주는 것</b><br>
+  • <b>지금 탑승</b>: 노선 자동 추정 → 하차 정류장 → N정거장 전 알람<br>
+  • <b>GPS + 버스 API</b> 중 먼저 조건 만족한 쪽이 알람 (API는 일부러 지연)<br>
+  • <b>이어폰</b> 연결/미연결에 따른 알람·경고 분기<br>
+  • <b>루틴</b> 자동 시작, <b>오늘만 취소</b><br>
+  • 종료 후 <b>루틴으로 저장</b><br>
+  • <b>주변 정류장 없음</b> → 이름으로 승차 정류장·역 <b>직접 검색</b>, 노선 직접 검색<br>
+  • <b>지하철 모드</b>: GPS 불가 → 센서 정차 카운트 + 열차 API 융합 (센서가 1회 놓쳐도 API가 보정)
+  </div>
+  <div class="card sub">※ 모든 위치·버스·노선은 가상 데이터입니다. 실제 앱은 공공 버스 API와 폰 GPS를 사용합니다.</div>
+</div>
+
+<script>
+/* ---------- 가상 데이터 ---------- */
+const DATA={
+  bus:{icon:"🚌",stops:["가상역 1번출구","시청앞","중앙시장","도서관","대학교 정문","공원입구","체육관","구청","병원앞","주민센터","신도시광장","종점차고지"],
+       cands:[["데모 3번",92],["11번",5],["705번",3]]},
+  subway:{icon:"🚇",stops:["가상역","중앙로","시청","환승역","대학로","공원역","체육관역","구청역","병원역","신도시역","호수공원","종점역"],
+       cands:[["2호선 내선 · 종점역행",89],["2호선 외선 · 가상역행",8],["9호선 급행",3]]}
+};
+const ST=m=>DATA[m||"bus"].stops;
+const U=m=>m==="subway"?"역":"정거장";
+const DAYS=["월","화","수","목","금","토","일"];
+let saved=null;try{saved=JSON.parse(localStorage.getItem("busDemo")||"null")}catch(e){}
+const store=saved||{routines:[{id:1,name:"출근",days:[0,1,2,3,4],time:"08:00",route:"데모 3번",to:8,n:2,skip:false}],recent:["도서관"],nextId:2};
+const save=()=>{try{localStorage.setItem("busDemo",JSON.stringify(store))}catch(e){}};
+
+const ALL={bus:["데모 3번","11번","705번","143번","6001번","N13번(심야)"],subway:["2호선 내선 · 종점역행","2호선 외선 · 가상역행","9호선 급행","1호선 상행","4호선 하행"]};
+const S={noLoc:false,tab:"home",speed:1,ear:true,trip:null,timer:null,draft:null,saved:false};
+
+/* ---------- 유틸 ---------- */
+const $=id=>document.getElementById(id);
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("show"),2400)}
+function go(tab){S.tab=tab;$("t-home").className=tab==="home"?"on":"";$("t-routine").className=tab==="routine"?"on":"";render()}
+function setSpeed(v,el){S.speed=v;document.querySelectorAll("[data-sp]").forEach(e=>e.classList.toggle("on",e===el))}
+function setEar(v){S.ear=v;$("earOn").classList.toggle("on",v);$("earOff").classList.toggle("on",!v);$("earTag").textContent=v?"🎧 이어폰 연결됨":"🔇 이어폰 없음";if(S.tab==="home"&&!S.trip)render()}
+function tickClock(){const d=new Date(),t=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"),dt=d.toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"});
+  document.querySelectorAll(".clk").forEach(e=>e.textContent=t);document.querySelectorAll(".dt").forEach(e=>e.textContent=dt)}
+tickClock();setInterval(tickClock,1000);
+
+/* ---------- 소리 ---------- */
+let ac;function beep(){try{ac=ac||new AudioContext();[0,.25,.5].forEach(t=>{const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.15;o.connect(g);g.connect(ac.destination);o.start(ac.currentTime+t);o.stop(ac.currentTime+t+.15)})}catch(e){}}
+let ringH;function startRing(){beep();ringH=setInterval(beep,1500);navigator.vibrate&&navigator.vibrate([300,150,300])}
+function dismiss(){clearInterval(ringH);$("ovRing").classList.remove("show");$("ovWarn").classList.remove("show")}
+
+/* ---------- 화면 ---------- */
+function render(){
+  const el=$("screen");
+  if(S.trip){el.innerHTML=tripView();return}
+  if(S.tab==="routine"){el.innerHTML=routineView();return}
+  if(S.draft){el.innerHTML=draftView();return}
+  el.innerHTML=homeView();
+}
+function homeView(){
+  return `<h1>안녕하세요 👋</h1><div class="sub">지금 타는 버스·지하철, 내릴 곳을 놓치지 마세요.</div>
+  <div class="row" style="margin:18px 0"><button class="btn big" style="font-size:18px" onclick="startDraft('bus')">🚌 버스<br>지금 탑승</button><button class="btn big" style="font-size:18px;background:#a78bfa" onclick="startDraft('subway')">🚇 지하철<br>지금 탑승</button></div>
+  ${S.ear?"":`<div class="card" style="border:1px solid var(--warn)"><span class="badge warn">주의</span> 이어폰이 연결되어 있지 않아요. 알람 시 경고만 표시됩니다.</div>`}
+  <h2>오늘의 루틴</h2>
+  ${store.routines.map(r=>`<div class="card"><div class="row"><div><b>${r.name}</b> <span class="badge ${r.skip?"bad":"ok"}">${r.skip?"오늘 취소됨":"예정"}</span><div class="sub">${DATA[r.mode||"bus"].icon} ${r.time} · ${r.route} · ${ST(r.mode)[r.to]} ${r.n}${U(r.mode)} 전</div></div><button class="btn sm ${r.skip?"ghost":"bad"}" style="flex:0 0 auto" onclick="toggleSkip(${r.id})">${r.skip?"취소 해제":"오늘만 취소"}</button></div></div>`).join("")||`<div class="sub">등록된 루틴이 없어요.</div>`}
+  <h2>최근 하차 정류장·역</h2><div class="sub">${store.recent.join(" · ")}</div>`;
+}
+function toggleSkip(id){const r=store.routines.find(x=>x.id===id);r.skip=!r.skip;save();toast(r.skip?"오늘 하루만 취소했어요 (내일은 정상 작동)":"취소를 해제했어요");render()}
+
+/* --- 지금 탑승 draft --- */
+function startDraft(mode){
+  // 데모 컨트롤 "주변 정류장 없음"이면 자동 인식을 건너뛰고 바로 수동 검색으로
+  S.draft={mode,step:S.noLoc?"manual":"detect",why:S.noLoc?"none":"",pos:1,prog:0,route:null,to:null,n:2,q:"",rq:"",manual:false};render();
+  if(!S.noLoc)runDetect();
+}
+function runDetect(){
+  const d=S.draft;d.step="detect";d.prog=0;render();
+  clearInterval(S.dh);
+  S.dh=setInterval(()=>{if(S.draft!==d||d.step!=="detect"){clearInterval(S.dh);return}d.prog+=8;if(d.prog>=100){clearInterval(S.dh);d.step="pick";d.cand=DATA[d.mode].cands}render()},300);
+}
+/* --- 수동 검색 (폴백) --- */
+const norm=s=>s.replace(/\s/g,"");
+function qListHtml(d){
+  const list=ST(d.mode),r=list.map((s,i)=>[s,i]).filter(([s,i])=>i<=list.length-5&&norm(s).includes(norm(d.q)));
+  return r.length?r.map(([s,i])=>`<div class="item" onclick="d_board(${i})"><span>${s}</span><span class="sub">${store.recent.includes(s)?"⭐ 최근":""}</span></div>`).join(""):`<div class="sub" style="padding:12px">검색 결과가 없어요. 다른 이름으로 검색해 보세요.</div>`;
+}
+function routeListHtml(d){
+  const r=ALL[d.mode].filter(n=>norm(n).includes(norm(d.rq)));
+  return r.length?r.map(n=>`<div class="item" onclick="d_route('${n}')"><span>${DATA[d.mode].icon} ${n}</span></div>`).join(""):`<div class="sub" style="padding:12px">일치하는 노선이 없어요.</div>`;
+}
+function d_q(v){S.draft.q=v;$("qlist").innerHTML=qListHtml(S.draft)}
+function d_rq(v){S.draft.rq=v;$("rlist").innerHTML=routeListHtml(S.draft)}
+function d_board(i){const d=S.draft;d.pos=i;d.manual=true;toast("📍 "+ST(d.mode)[i]+"을(를) 승차 위치로 설정했어요");runDetect()}
+function d_manual(){const d=S.draft;d.step="manual";d.why="link";d.q="";render()}
+function d_rsearch(){const d=S.draft;d.step="rsearch";d.rq="";render()}
+function d_retry(){if(S.noLoc){toast("📍 여전히 주변에서 찾지 못했어요");return}S.draft.manual=false;S.draft.pos=1;runDetect()}
+function setLoc(ok){S.noLoc=!ok;$("locOk").classList.toggle("on",ok);$("locNo").classList.toggle("on",!ok)}
+const INP='style="width:100%;padding:12px;border-radius:10px;background:var(--card);color:var(--txt);border:1px solid var(--line);margin:14px 0 10px;font-size:14px"';
+function draftView(){
+  const d=S.draft,W=d.mode==="bus"?"정류장":"역";
+  if(d.step==="manual")return `<h1>승차 ${W} 직접 찾기</h1><div class="sub">${d.why==="none"?"📍 주변에서 가까운 "+W+" 정보를 찾지 못했어요. (GPS 오차·실내·위치 권한 문제일 수 있어요) 이름으로 직접 검색해 주세요.":"현재 위치와 다르면 직접 선택해 주세요."}</div>
+   <input id="q" type="search" placeholder="${W} 이름 검색 (예: 시청)" value="${d.q}" oninput="d_q(this.value)" ${INP}>
+   <div class="list" id="qlist">${qListHtml(d)}</div>
+   <button class="btn ghost" onclick="d_retry()">📍 내 위치로 다시 찾기</button><div style="height:8px"></div><button class="btn ghost" onclick="d_cancel()">취소</button>`;
+  if(d.step==="rsearch")return `<h1>노선 직접 검색</h1><div class="sub">노선 번호나 이름을 입력하세요</div>
+   <input id="rq" type="search" placeholder="예: ${d.mode==="bus"?"143":"9호선"}" value="${d.rq}" oninput="d_rq(this.value)" ${INP}>
+   <div class="list" id="rlist">${routeListHtml(d)}</div>
+   <button class="btn ghost" onclick="d_cancel()">취소</button>`;
+  if(d.step==="detect")return `<h1>노선 찾는 중…</h1><div class="sub">${d.mode==="bus"?"내 위치·이동 방향과 주변 버스 위치를 비교하고 있어요":"승차 역·열차 도착정보·가속도 센서를 비교하고 있어요"}</div>
+   <div class="card" style="margin-top:16px"><div class="bar"><i style="width:${d.prog}%"></i></div><div class="sub" style="margin-top:10px">📍 ${d.manual?"선택한 승차지":(d.mode==="bus"?"내 위치":"승차 역")} (${ST(d.mode)[d.pos]}) &nbsp;|&nbsp; ${DATA[d.mode].icon} ${d.mode==="bus"?"주변 버스 3대":"방금 출발한 열차 3편"} 분석 ${d.prog}%</div></div>
+   <button class="btn ghost" onclick="d_manual()">📍 ${W} 위치가 달라요 (직접 찾기)</button><div style="height:8px"></div><button class="btn ghost" onclick="d_cancel()">취소</button>`;
+  if(d.step==="pick")return `<h1>이 ${d.mode==="bus"?"버스":"열차"}가 맞나요?</h1><div class="sub">일치도가 가장 높은 순서예요</div><div class="list" style="margin-top:14px">
+   ${d.cand.map(([n,p])=>`<div class="item" onclick="d_route('${n}')"><span>${DATA[d.mode].icon} <b>${n}</b></span><span class="badge ${p>50?"ok":""}">일치 ${p}%</span></div>`).join("")}</div>
+   <button class="btn ghost" style="margin-bottom:8px" onclick="d_rsearch()">🔎 목록에 없나요? 노선 직접 검색</button><button class="btn ghost" style="margin-bottom:8px" onclick="d_manual()">📍 ${W} 위치가 달라요 (직접 찾기)</button>
+   <button class="btn ghost" onclick="d_cancel()">취소</button>`;
+  if(d.step==="dest")return `<h1>어디서 내리세요?</h1><div class="sub">${d.route} · 현재 ${ST(d.mode)[d.pos]} 지나는 중</div>
+   <h2>몇 ${U(d.mode)} 전에 알려드릴까요?</h2><div class="row">${[1,2,3].map(k=>`<div class="chip ${d.n===k?"on":""}" onclick="d_n(${k})">${k}${U(d.mode)} 전</div>`).join("")}</div>
+   <h2>하차 ${d.mode==="bus"?"정류장":"역"}</h2><div class="list">${ST(d.mode).map((s,i)=>`<div class="item ${i<=d.pos+d.n?"dis":""}" onclick="d_dest(${i})"><span>${s}</span><span class="sub">${store.recent.includes(s)?"⭐ 최근":""}</span></div>`).join("")}</div>
+   <button class="btn ghost" onclick="d_cancel()">취소</button>`;
+}
+function d_cancel(){S.draft=null;render()}
+function d_route(n){S.draft.route=n;S.draft.step="dest";render()}
+function d_n(k){S.draft.n=k;render()}
+function d_dest(i){const d=S.draft;startTrip({mode:d.mode,route:d.route,to:i,n:d.n,pos:d.pos,source:"instant"});S.draft=null}
+
+/* --- 루틴 --- */
+function routineView(){
+  return `<h1>루틴</h1><div class="sub">정해진 요일·시간에 알람을 자동으로 켜줘요</div>
+  <div style="margin:12px 0">${store.routines.map(r=>`<div class="card"><div class="row"><div><b>${r.name}</b> <span class="badge">${r.days.map(i=>DAYS[i]).join("")}</span>
+   <div class="sub">${DATA[r.mode||"bus"].icon} ${r.time} · ${r.route}<br>${ST(r.mode)[r.to]} ${r.n}${U(r.mode)} 전</div></div>
+   <div style="flex:0 0 auto;display:flex;flex-direction:column;gap:6px"><button class="btn sm" onclick="simRoutine(${r.id})">▶ 시간 도달 시뮬</button><button class="btn sm ghost" onclick="delRoutine(${r.id})">삭제</button></div></div></div>`).join("")}</div>
+  <h2>새 루틴</h2><div class="card">
+   <div class="row" style="margin-bottom:10px">${["bus","subway"].map(m=>`<div class="chip ${((S.nr||{}).mode||"bus")===m?"on":""}" onclick="nrMode('${m}')">${DATA[m].icon} ${m==="bus"?"버스":"지하철"}</div>`).join("")}</div>
+   <div class="sub">요일</div><div class="row" style="margin:6px 0 10px">${DAYS.map((d,i)=>`<div class="chip ${(S.nr||{days:[0,1,2,3,4]}).days.includes(i)?"on":""}" onclick="nrDay(${i})">${d}</div>`).join("")}</div>
+   <div class="sub">시작 시간</div><input type="time" id="nrTime" value="${(S.nr||{}).time||"18:00"}" style="margin:6px 0 10px">
+   <div class="sub">하차 정류장·역</div><select id="nrTo" style="margin:6px 0 10px">${ST((S.nr||{}).mode).map((s,i)=>`<option value="${i}" ${i===((S.nr||{}).to??3)?"selected":""}>${s}</option>`).join("")}</select>
+   <div class="sub">몇 정거장 전</div><select id="nrN" style="margin:6px 0 12px"><option>1</option><option selected>2</option><option>3</option></select>
+   <button class="btn" onclick="addRoutine()">루틴 추가</button></div>`;
+}
+function nrMode(m){S.nr=S.nr||{days:[0,1,2,3,4]};S.nr.mode=m;S.nr.to=3;S.nr.time=($("nrTime")||{}).value;render()}
+function nrDay(i){S.nr=S.nr||{days:[0,1,2,3,4]};const k=S.nr.days.indexOf(i);k<0?S.nr.days.push(i):S.nr.days.splice(k,1);S.nr.time=$("nrTime").value;S.nr.to=+$("nrTo").value;render()}
+function addRoutine(){const days=(S.nr||{days:[0,1,2,3,4]}).days;if(!days.length)return toast("요일을 선택해 주세요");store.routines.push({id:store.nextId++,name:"내 루틴",days:days.slice(),time:$("nrTime").value,mode:(S.nr||{}).mode||"bus",route:DATA[(S.nr||{}).mode||"bus"].cands[0][0],to:+$("nrTo").value,n:+$("nrN").value,skip:false});S.nr=null;save();toast("루틴이 추가됐어요");render()}
+function delRoutine(id){store.routines=store.routines.filter(r=>r.id!==id);save();render()}
+function simRoutine(id){
+  const r=store.routines.find(x=>x.id===id);
+  if(S.trip)return toast("이미 알람이 진행 중이에요");
+  if(r.skip){toast("🚫 오늘은 취소된 루틴이라 자동 시작하지 않아요");return}
+  S.tab="home";toast(`⏰ ${r.time} 루틴 시작! 평소 노선(${r.route})으로 자동 설정했어요`);
+  startTrip({mode:r.mode||"bus",route:r.route,to:r.to,n:r.n,pos:1,source:"routine",name:r.name});
+}
+
+/* --- 진행 중 --- */
+function startTrip(o){
+  S.saved=false;
+  S.trip={...o,bus:o.pos,gps:o.pos,api:o.pos,fired:false,done:false,fireBy:null};
+  go("home");
+  clearInterval(S.timer);
+  S.timer=setInterval(tick,250);
+}
+function tick(){
+  const t=S.trip;if(!t||t.done)return;
+  t.bus=Math.min(t.to,t.bus+0.1*S.speed);            // 버스 이동(초당 0.4정거장 × 속도)
+  // GPS: 4.5~7.4 구간은 '터널'이라 신호가 끊겨 마지막 위치에 멈춤
+  // 지하철: GPS 불가 → 가속도 센서가 정차 횟수를 센다(5번째 구간에서 1회 놓치는 상황을 연출)
+  t.gps=t.mode==="subway"?Math.max(t.pos,Math.floor(t.bus)-(t.bus>=5?1:0)):(t.bus>=4.5&&t.bus<7.4)?Math.min(t.gps,4.5):t.bus;
+  // 버스 API: 실시간이 아니라 약 2/3 정거장 늦게 갱신됨(정수 정류장 단위)
+  t.api=Math.max(t.pos,Math.floor(t.bus-0.7));
+  const trig=t.to-t.n;
+  if(!t.fired&&(t.gps>=trig||t.api>=trig)){
+    t.fired=true;t.fireBy=t.gps>=trig?(t.mode==="subway"?"센서 정차카운트":"GPS"):(t.mode==="subway"?"열차 API":"버스 API");fire();
+  }
+  if(t.bus>=t.to){t.done=true;clearInterval(S.timer);
+    const nm=ST(t.mode)[t.to];store.recent=[nm,...store.recent.filter(x=>x!==nm)].slice(0,4);save();}
+  updateTrip();
+}
+function fire(){
+  const t=S.trip,left=t.n;
+  if(typeof notify==="function")notify(`${left}${U(t.mode)} 후 하차!`,`${ST(t.mode)[t.to]}에서 내리세요`);
+  if(S.ear){$("ringTitle").textContent=`${left}${U(t.mode)} 후 하차!`;$("ringSub").innerHTML=`<b>${ST(t.mode)[t.to]}</b>에서 내리세요<br><span class="sub">감지 기준: ${t.fireBy}</span>`;$("ovRing").classList.add("show");startRing()}
+  else{$("warnSub").innerHTML=`${left}${U(t.mode)} 후 <b>${ST(t.mode)[t.to]}</b> 하차 예정<br><span class="sub">감지 기준: ${t.fireBy}</span>`;$("ovWarn").classList.add("show");navigator.vibrate&&navigator.vibrate([500,200,500,200,500])}
+}
+function tripView(){
+  const t=S.trip,trig=t.to-t.n;
+  return `<div class="row"><div><h1>${t.source==="routine"?"⏰ 루틴 진행 중":DATA[t.mode].icon+" 알람 진행 중"}</h1><div class="sub">${t.route} → ${ST(t.mode)[t.to]} (${t.n}${U(t.mode)} 전 알림)</div></div></div>
+  <div class="card" style="margin-top:12px"><div class="row"><div><div class="sub">남은 ${t.mode==="bus"?"정거장":"역"}</div><div style="font-size:34px;font-weight:800" id="remain"></div></div>
+   <div style="text-align:right"><div class="sub">알림 시점</div><div id="armed"></div></div></div>
+   <div class="row" style="margin-top:10px"><div><span class="badge" id="gpsB"></span></div><div style="text-align:right"><span class="badge" id="apiB"></span></div></div></div>
+  <div class="route" id="route"><div class="bus" id="bus">${DATA[t.mode].icon}</div>
+  ${ST(t.mode).map((s,i)=>`<div class="stop ${i===trig?"trig":""} ${i===t.to?"dest":""}" id="st${i}">${s}${i===trig?" 🔔 알림":""}${i===t.to?" 🏁 하차":""}</div>`).join("")}</div>
+  <div id="endBox"></div><button class="btn ghost" id="stopBtn" onclick="endTrip()">알람 종료</button>`;
+}
+function updateTrip(){
+  const t=S.trip;if(!t||!$("bus"))return;
+  $("bus").style.top=(t.bus*30+3)+"px";
+  ST(t.mode).forEach((_,i)=>$("st"+i).classList.toggle("past",i<Math.floor(t.bus)));
+  const left=Math.max(0,t.to-Math.floor(t.bus));
+  $("remain").textContent=left+"개";
+  $("armed").innerHTML=t.fired?`<span class="badge ok">✔ 울림 (${t.fireBy})</span>`:`<span class="badge warn">대기 중</span>`;
+  const inTunnel=t.bus>=4.5&&t.bus<7.4&&!t.done;
+  if(t.mode==="subway"){
+    $("gpsB").className="badge "+(t.bus>=5&&!t.done?"warn":"ok");
+    $("gpsB").textContent="🔇GPS불가 · 📳센서 "+ST(t.mode)[t.gps]+(t.bus>=5&&!t.done?" ⚠1회 놓침":"");
+    $("apiB").className="badge";$("apiB").textContent="🚇열차API: "+ST(t.mode)[t.api];
+  }else{
+    $("gpsB").className="badge "+(inTunnel?"bad":"ok");$("gpsB").textContent=inTunnel?"📡 GPS 끊김(터널)":"📡 GPS 정상";
+    $("apiB").className="badge";$("apiB").textContent="🛰 버스API: "+ST(t.mode)[t.api];
+  }
+  if(t.done&&!$("endBox").innerHTML){
+    $("stopBtn").textContent="닫기";
+    $("endBox").innerHTML=`<div class="card" style="margin-top:12px">🏁 <b>${ST(t.mode)[t.to]}</b> 도착! 알람이 종료됐어요.${t.source==="instant"?`<button class="btn" style="margin-top:10px" onclick="saveAsRoutine()">🔁 이 설정을 루틴으로 저장</button>`:""}</div>`;
+  }
+}
+function saveAsRoutine(){
+  const t=S.trip;store.routines.push({id:store.nextId++,name:"저장한 루틴",days:[0,1,2,3,4],time:"08:00",mode:t.mode,route:t.route,to:t.to,n:t.n,skip:false});save();
+  toast("루틴으로 저장했어요 (평일 08:00). 루틴 탭에서 수정할 수 있어요");endTrip();S.tab="routine";go("routine");
+}
+function endTrip(){clearInterval(S.timer);dismiss();S.trip=null;render()}
+setEar(true);render();
+</script>
+
+<script>
+/* ---------- iPhone 셸: 전원 · 잠금 · 홈 · 앱 실행 ---------- */
+const OS={locked:true,off:false,app:null,pin:"",pending:false};
+const $q=s=>document.querySelector(s);
+
+/* 화면 높이에 맞춰 폰 크기 자동 조절 */
+function fit(){document.documentElement.style.setProperty("--k",Math.min(1,(innerHeight-40)/826))}
+fit();addEventListener("resize",fit);
+
+/* iOS 상태바 아이콘 */
+const SIGNAL='<svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>'
+ +'<svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.3 0 4.4.9 6 2.4l1.1-1.2C13.7 1.7 11.2.6 8.5.6S3.3 1.7 1.4 3.5l1.1 1.2c1.6-1.5 3.7-2.4 6-2.4z"/><path d="M8.5 6c1.3 0 2.4.5 3.3 1.3l1.1-1.2C11.8 5 10.2 4.3 8.5 4.3S5.2 5 4.1 6.1l1.1 1.2C6.100 6.500 7.200 6 8.500 6z"/><path d="M8.5 9.5c.6 0 1.1.2 1.5.6L8.5 11.800 7 10.100c.4-.4.9-.6 1.5-.6z"/></svg>'
+ +'<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"/><path d="M25 4.5v4c.8-.3 1.5-1.1 1.5-2s-.7-1.7-1.5-2z" fill="currentColor" opacity=".45"/></svg>';
+document.querySelectorAll(".sysic").forEach(e=>e.innerHTML=SIGNAL);
+
+/* 앱 목록 */
+const APPS=[
+ {app:"app",n:"하차알람",e:"🚌",bg:"linear-gradient(160deg,#5ccbff,#2563eb)"},
+ {n:"지도",e:"🗺️",bg:"linear-gradient(160deg,#86efac,#16a34a)"},
+ {n:"캘린더",e:"📅",bg:"linear-gradient(160deg,#ffffff,#d1d5db)"},
+ {n:"시계",e:"⏰",bg:"linear-gradient(160deg,#52525b,#18181b)"},
+ {n:"날씨",e:"⛅",bg:"linear-gradient(160deg,#7dd3fc,#3b82f6)"},
+ {n:"메모",e:"📝",bg:"linear-gradient(160deg,#fef08a,#f59e0b)"},
+ {n:"사진",e:"🌸",bg:"linear-gradient(160deg,#fbcfe8,#c084fc)"},
+ {n:"계산기",e:"🧮",bg:"linear-gradient(160deg,#fdba74,#ea580c)"},
+ {n:"설정",e:"⚙️",bg:"linear-gradient(160deg,#cbd5e1,#64748b)"},
+ {n:"음악",e:"🎵",bg:"linear-gradient(160deg,#fda4af,#e11d48)"},
+ {n:"쇼핑",e:"🛍️",bg:"linear-gradient(160deg,#fde047,#d97706)"},
+ {n:"건강",e:"❤️",bg:"linear-gradient(160deg,#ffffff,#fecdd3)"},
+ {n:"나침반",e:"🧭",bg:"linear-gradient(160deg,#52525b,#09090b)"},
+ {n:"책",e:"📚",bg:"linear-gradient(160deg,#fdba74,#c2410c)"},
+ {n:"지갑",e:"💳",bg:"linear-gradient(160deg,#4b5563,#111827)"},
+ {n:"팟캐스트",e:"🎙️",bg:"linear-gradient(160deg,#d8b4fe,#7e22ce)"}
+];
+const DOCK=[{n:"전화",e:"📞",bg:"linear-gradient(160deg,#86efac,#15803d)"},{n:"Safari",e:"🧭",bg:"linear-gradient(160deg,#ffffff,#bfdbfe)"},{n:"메시지",e:"💬",bg:"linear-gradient(160deg,#86efac,#22c55e)"},{n:"음악",e:"🎧",bg:"linear-gradient(160deg,#fda4af,#e11d48)"}];
+const iconHtml=a=>`<div class="icon" data-app="${a.app||"dapp"}" data-n="${a.n}" data-e="${a.e}" onclick="openApp(this)"><div class="ic" style="background:${a.bg}">${a.e}</div><span>${a.n}</span></div>`;
+$("grid").innerHTML=APPS.map(iconHtml).join("");
+$("dock").innerHTML=DOCK.map(iconHtml).join("");
+
+/* 홈 위젯 */
+function drawWidget(){
+  const r=store.routines.find(x=>!x.skip)||store.routines[0];
+  $("widget").innerHTML=`<div class="wh">🚌 하차알람</div>`+(r?`<div><div class="w1">${r.time} ${r.name}</div><div class="w2">${r.route} → ${ST(r.mode)[r.to]} ${r.n}${U(r.mode)} 전 알림</div></div>`:`<div class="w1">루틴 없음</div>`)+`<div class="wb">지금 탑승 ›</div>`;
+}
+drawWidget();
+
+/* 앱 열기 / 홈으로 (아이콘 위치에서 펼쳐지고, 닫히면 아이콘으로 돌아감) */
+function updBar(){$("osbar").classList.toggle("hide",!OS.locked&&!!OS.app)}
+function centerIn(el,root){let x=0,y=0,e=el;while(e&&e!==root){x+=e.offsetLeft;y+=e.offsetTop;e=e.offsetParent}return[x+el.offsetWidth/2,y+el.offsetHeight/2]}
+function openApp(el){
+  const id=el.dataset.app,a=$(id);
+  if(OS.app&&OS.app!==id)$(OS.app).classList.remove("open");
+  if(id==="dapp"){$("dname").textContent=el.dataset.n;$("demo").textContent=el.dataset.e}
+  const [cx,cy]=centerIn(el.querySelector(".ic")||el,$q(".phone"));
+  a.style.transformOrigin=cx+"px "+cy+"px";
+  a.classList.add("open");$("home").classList.add("dim");OS.app=id;hideBanner();updBar();
+}
+function openBus(){openApp($q('[data-app="app"]'))}
+function goHome(){
+  if(!OS.app)return;
+  $(OS.app).classList.remove("open");OS.app=null;$("home").classList.remove("dim");updBar();
+}
+function homeBar(){if(OS.locked){if($("pin").classList.contains("show"))hidePin();return}goHome()}
+
+/* 화면 켜기/끄기 (측면 버튼) */
+function setOff(v){OS.off=v;$("black").classList.toggle("on",v)}
+function power(){if(OS.off){setOff(false)}else{lock();setOff(true)}}
+
+/* 잠금 / 해제 */
+function lock(){OS.locked=true;OS.pin="";OS.pending=false;hidePin();hideBanner();$("lock").classList.remove("gone","drag");$("lock").style.transform="";updBar()}
+function unlock(){
+  OS.locked=false;OS.pin="";drawDots();$("lock").classList.add("gone");updBar();
+  if(OS.pending){OS.pending=false;setTimeout(openBus,380)}
+}
+function showPin(){$("lmain").classList.add("hide");$("pin").classList.add("show")}
+function hidePin(){$("lmain").classList.remove("hide");$("pin").classList.remove("show");OS.pin="";drawDots()}
+function drawDots(){document.querySelectorAll("#dots i").forEach((d,i)=>d.classList.toggle("f",i<OS.pin.length));const p=$("pdel");if(p)p.textContent=OS.pin.length?"삭제":"취소"}
+function pinKey(k){
+  if(k==="del"){OS.pin=OS.pin.slice(0,-1);drawDots();return}
+  if(OS.pin.length>=4)return;
+  OS.pin+=k;drawDots();
+  if(OS.pin.length===4)setTimeout(unlock,220);
+}
+function pinDel(){OS.pin.length?pinKey("del"):hidePin()}
+const LET=["","ABC","DEF","GHI","JKL","MNO","PQRS","TUV","WXYZ"];
+$("pad").innerHTML=[1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="pinKey('${n}')"><b>${n}</b><small>${LET[n-1]}</small></button>`).join("")
+  +`<button class="sm" tabindex="-1">긴급 상황</button><button onclick="pinKey('0')"><b>0</b><small></small></button><button class="sm" id="pdel" onclick="pinDel()">취소</button>`;
+function flash(e){e.currentTarget.classList.toggle("on")}
+
+/* 잠금화면 쓸어올리기 */
+(function(){
+  const lk=$("lock"),lm=$("lmain");let y0=null,dy=0;
+  lm.addEventListener("pointerdown",e=>{if(e.target.closest(".ncard,.lbtn"))return;y0=e.clientY;dy=0;lm.setPointerCapture(e.pointerId);lk.classList.add("drag")});
+  lm.addEventListener("pointermove",e=>{if(y0===null)return;dy=Math.min(0,e.clientY-y0);lk.style.transform=`translateY(${dy*.6}px)`});
+  const end=()=>{if(y0===null)return;y0=null;lk.classList.remove("drag");lk.style.transform="";if(dy<-70||dy>-6)showPin()};
+  lm.addEventListener("pointerup",end);lm.addEventListener("pointercancel",()=>{y0=null;lk.classList.remove("drag");lk.style.transform=""});
+})();
+
+/* 알림 · 다이내믹 아일랜드 */
+function addLockCard(title,body,now){
+  const box=$("lnotifs"),c=document.createElement("div");c.className="ncard";
+  c.innerHTML=`<div class="ni">🚌</div><div class="nt"><div class="nh"><b>하차알람</b><span>${now?"지금":"오늘"}</span></div><b>${title}</b><br>${body}</div>`;
+  c.onclick=()=>{OS.pending=true;showPin()};
+  box.prepend(c);while(box.children.length>3)box.lastChild.remove();
+}
+let bannerH,isH;
+function showBanner(t,b){$("bt").textContent=t;$("bb").textContent=b;$("banner").classList.add("show");clearTimeout(bannerH);bannerH=setTimeout(hideBanner,5000)}
+function hideBanner(){$("banner").classList.remove("show")}
+function bannerTap(){hideBanner();openBus()}
+function island(t){$("itxt").textContent=t;$("island").classList.add("big");clearTimeout(isH);isH=setTimeout(()=>$("island").classList.remove("big"),3200)}
+function notify(title,body){
+  if(OS.locked||OS.off){if(OS.off)setOff(false);addLockCard(title,body,true)}
+  else if(OS.app!=="app")showBanner(title,body);
+  island("🚌 "+title);
+}
+/* 처음 잠금화면에 보이는 알림 */
+(function(){const r=store.routines.find(x=>!x.skip);if(r)addLockCard(`오늘 ${r.time} '${r.name}' 루틴`,`${r.route} · ${ST(r.mode)[r.to]} ${r.n}${U(r.mode)} 전에 알려드려요`,false)})();
+
+/* 키보드 */
+document.addEventListener("keydown",e=>{
+  if(OS.off)return;
+  if(OS.locked){
+    if($("pin").classList.contains("show")){
+      if(/^[0-9]$/.test(e.key))pinKey(e.key);else if(e.key==="Backspace")pinKey("del");else if(e.key==="Escape")hidePin();
+    }else if(["Enter"," ","ArrowUp"].includes(e.key)){e.preventDefault();showPin()}
+  }else if(e.key==="Escape"&&!/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))goHome();
+});
+</script>
+</body>
+</html>
